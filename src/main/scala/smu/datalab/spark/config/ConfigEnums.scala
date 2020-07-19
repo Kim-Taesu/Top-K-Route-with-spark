@@ -34,6 +34,7 @@ object ConfigEnums {
   val CNT_EMP: String = "CntEmp"
   val EMPTY: String = ""
 
+
   val HEADER: String = "header"
   val PROB: String = "prob"
   val RLP: String = "rlp"
@@ -43,6 +44,16 @@ object ConfigEnums {
   val ORIGIN: String = "origin"
   val COUNT: String = "count"
   val TOTAL: String = "total"
+  val NOISE_START: String = s"${NOISE}_$START"
+  val NOISE_END: String = s"${NOISE}_$END"
+  val ORIGIN_START: String = s"${ORIGIN}_$START"
+  val ORIGIN_END: String = s"${ORIGIN}_$END"
+
+  val DEST_SIZE: String = "destSize"
+  val SAVE: String = "save"
+  val ORIGIN_DATA_PROB_PATH: String = "originDataProb"
+  val NOISE_DATA_PATH: String = "noiseDataPath"
+  val E_STEP_INIT_DATA_PATH: String = "eStepInitDataPath"
 
   val RAW_DATA_DEST_COL_INDEX: Int = 3
 

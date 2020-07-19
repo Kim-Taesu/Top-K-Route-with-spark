@@ -37,3 +37,4 @@ data/raw_data
 data/test/test_1m.csv
 data/test/test_10m.csv
 data/test/test_all.csv
+data/result

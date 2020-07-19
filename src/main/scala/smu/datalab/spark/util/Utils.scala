@@ -3,7 +3,7 @@ package smu.datalab.spark.util
 import org.apache.log4j.lf5.LogLevel
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.{Column, DataFrame, SparkSession}
+import org.apache.spark.sql.{Column, DataFrame, SaveMode, SparkSession}
 import smu.datalab.spark.config.ConfigEnums._
 import smu.datalab.spark.schema.Schema.rawDataSchema
 
@@ -14,16 +14,14 @@ object Utils {
   }
 
   def buildSparkSession(appName: String): SparkSession = {
-    SparkSession.builder()
+    val sparkSession = SparkSession.builder()
       .master("local[*]")
       .appName(appName)
       .config("spark.sql.crossJoin.enabled", value = true)
       .config("org.apache.spark.serializer.KryoSerializer", value = true)
       .getOrCreate()
-  }
-
-  def setLogLevel(spark: SparkSession, level: LogLevel): Unit = {
-    spark.sparkContext.setLogLevel(level.toString)
+    sparkSession.sparkContext.setLogLevel(LogLevel.WARN.toString)
+    sparkSession
   }
 
   def makeColList(cols: String*): Seq[Column] = {
@@ -45,6 +43,17 @@ object Utils {
       .withColumn(END, lead(START, 1)
         .over(Window.partitionBy(TAXI_ID).orderBy(DAY, TIME)))
       .na.drop()
+  }
+
+  def loadDataFrame(sparkSession: SparkSession, path: String): DataFrame = {
+    sparkSession.read.load(path)
+  }
+
+  def saveDataFrame(dataFrame: DataFrame, savePath: String, saveFileFormat: String): Unit = {
+    dataFrame.write
+      .mode(SaveMode.Overwrite)
+      .format(saveFileFormat)
+      .save(savePath)
   }
 
 }
