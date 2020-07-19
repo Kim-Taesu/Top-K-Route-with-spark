@@ -1,4 +1,4 @@
-package smu.datalab.spark.init
+package smu.datalab.spark
 
 import com.typesafe.config.ConfigFactory
 import org.apache.spark.broadcast.Broadcast
@@ -33,7 +33,6 @@ object MakeNoiseData {
     val spark: SparkSession = buildSparkSession("add noise to raw data")
 
     val conf = ConfigFactory.load(CONFIG_PATH.toString)
-
     val paramConf: Broadcast[ParamConfig] = spark.sparkContext.broadcast(ParamConfig(conf))
     val pathConf: PathConfig = PathConfig(conf)
 

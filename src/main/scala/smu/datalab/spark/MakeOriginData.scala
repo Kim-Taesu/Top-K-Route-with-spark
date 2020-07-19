@@ -1,4 +1,4 @@
-package smu.datalab.spark.init
+package smu.datalab.spark
 
 import com.typesafe.config.ConfigFactory
 import org.apache.spark.broadcast.Broadcast
@@ -7,7 +7,7 @@ import org.apache.spark.sql.functions.{col, lit, sum, udf}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import smu.datalab.spark.config.ConfigEnums._
 import smu.datalab.spark.config.{ParamConfig, PathConfig}
-import smu.datalab.spark.util.Utils.{buildSparkSession, loadRawDataFrame, makeColName, saveDataFrame}
+import smu.datalab.spark.util.Utils.{buildSparkSession, loadRawDataFrame, saveDataFrame}
 
 import scala.sys.exit
 
@@ -31,12 +31,14 @@ object MakeOriginData {
     val spark: SparkSession = buildSparkSession("make origin data prob")
 
     val conf = ConfigFactory.load(CONFIG_PATH.toString)
-
     val paramConf: Broadcast[ParamConfig] = spark.sparkContext.broadcast(ParamConfig(conf))
-    val destCodeList: Seq[String] = paramConf.value.getDestCodeList(destNum)
-
     val pathConf: PathConfig = PathConfig(conf)
+
+    val destCodeList: Seq[String] = paramConf.value.getDestCodeList(destNum)
     val rawDataPath: String = pathConf.testSamplePath
+
+    val rawDataDF: DataFrame = loadRawDataFrame(spark, rawDataPath, destCodeList)
+    rawDataDF.cache()
 
     val getBitMask: String => String = dest => {
       val index = destCodeList.indexOf(dest)
@@ -44,25 +46,18 @@ object MakeOriginData {
       val postfix = NO_EXIST * (destCodeList.size - (index + 1))
       prefix + EXIST + postfix
     }
-
     val makeBitMaskUdf: UserDefinedFunction = udf(getBitMask(_: String))
 
-    val rawDataDF: DataFrame = loadRawDataFrame(spark, rawDataPath, destCodeList)
-    rawDataDF.cache()
-
-    val originStart: String = makeColName(ORIGIN, START)
-    val originEnd: String = makeColName(ORIGIN, END)
-
     val originDataCountDF: DataFrame = rawDataDF
-      .withColumn(originStart, makeBitMaskUdf(col(START)))
-      .withColumn(originEnd, makeBitMaskUdf(col(END)))
-      .groupBy(originStart, originEnd).count()
+      .withColumn(ORIGIN_START, makeBitMaskUdf(col(START)))
+      .withColumn(ORIGIN_END, makeBitMaskUdf(col(END)))
+      .groupBy(ORIGIN_START, ORIGIN_END).count()
 
     val total: Broadcast[Long] = spark.sparkContext.broadcast(originDataCountDF.agg(sum(COUNT)).collect().map(_.getLong(0)).apply(0))
 
     val originDataProbDF: DataFrame = originDataCountDF
       .withColumn(PROB, col(COUNT) / lit(total.value))
-      .select(originStart, originEnd, PROB)
+      .select(ORIGIN_START, ORIGIN_END, PROB)
 
     saveDataFrame(originDataProbDF, pathConf.originDataProbPath, paramConf.value.saveFileFormat)
   }

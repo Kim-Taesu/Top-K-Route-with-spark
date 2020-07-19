@@ -16,29 +16,5 @@ object Schema {
     StructField(EMPTY, StringType)
   ))
 
-  private val _eStepInitSchema = StructType(Seq(
-    StructField("rlp", StringType),
-    StructField("rlc", StringType),
-    StructField("a", StringType),
-    StructField("b", StringType),
-    StructField("prob", StringType)
-  ))
-
-  private val _originSchema = StructType(Seq(
-    StructField("a", StringType),
-    StructField("b", StringType)
-  ))
-
-  private val _noiseSchema = StructType(Seq(
-    StructField("rlp", StringType),
-    StructField("rlc", StringType)
-  ))
-
-  def originSchema: StructType = _originSchema
-
-  def noiseSchema: StructType = _noiseSchema
-
   def rawDataSchema: StructType = _rawDataSchema
-
-  def eStepInitSchema: StructType = _eStepInitSchema
 }

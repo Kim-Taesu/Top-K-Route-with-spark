@@ -1,10 +1,10 @@
-package smu.datalab.spark.init
+package smu.datalab.spark
 
 import com.typesafe.config.ConfigFactory
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.sql.expressions.UserDefinedFunction
 import org.apache.spark.sql.functions.{col, udf}
-import org.apache.spark.sql.{DataFrame, Dataset, Row, SparkSession}
+import org.apache.spark.sql.{DataFrame, SparkSession}
 import smu.datalab.spark.config.ConfigEnums._
 import smu.datalab.spark.config.{ParamConfig, PathConfig}
 import smu.datalab.spark.util.Utils.{buildSparkSession, loadDataFrame, makeColName, saveDataFrame}
@@ -31,22 +31,22 @@ object MakeEStepInitData {
     import spark.implicits._
 
     val conf = ConfigFactory.load(CONFIG_PATH.toString)
-
     val paramConf: Broadcast[ParamConfig] = spark.sparkContext.broadcast(ParamConfig(conf))
-    val qValue = paramConf.value.qValue
-    val pValue = paramConf.value.pValue
-
     val pathConf: PathConfig = PathConfig(conf)
 
+    val qValue = paramConf.value.qValue
+    val pValue = paramConf.value.pValue
     val saveFileFormat = paramConf.value.saveFileFormat
+    val probNoiseStartToOriginStart: String = makeColName(NOISE_START, ORIGIN_START, PROB)
+    val probNoiseEndToOriginEnd: String = makeColName(NOISE_END, ORIGIN_END, PROB)
 
     val noiseDataDF: DataFrame = loadDataFrame(spark, s"${pathConf.noiseDataPath}/*.$saveFileFormat")
-    val noiseBitMaskTmp: String = noiseDataDF.select(NOISE_START).first().getString(0)
+    val noiseBitMaskRowTmp: String = noiseDataDF.select(NOISE_START).first().getString(0)
 
-    val originArray: Seq[String] = for (i <- noiseBitMaskTmp.indices) yield NO_EXIST * noiseBitMaskTmp.length + (1 << i).toBinaryString takeRight noiseBitMaskTmp.length
-    val originCase: DataFrame = originArray.toList.toDF(ORIGIN_START)
-    val originCaseDF: Dataset[Row] = originCase
-      .crossJoin(originCase.withColumnRenamed(ORIGIN_START, ORIGIN_END))
+    val originArray: Seq[String] = for (i <- noiseBitMaskRowTmp.indices) yield NO_EXIST * noiseBitMaskRowTmp.length + (1 << i).toBinaryString takeRight noiseBitMaskRowTmp.length
+    val originCaseDF: DataFrame = originArray.toList.toDF(ORIGIN_START)
+    val originCaseCrossedDF: DataFrame = originCaseDF
+      .crossJoin(originCaseDF.withColumnRenamed(ORIGIN_START, ORIGIN_END))
 
     val getProb: (String, String) => Double = (noise, origin) => {
       var prob: Double = 1.0
@@ -62,13 +62,11 @@ object MakeEStepInitData {
       }
       prob
     }
-
     val getProbUdf: UserDefinedFunction = udf(getProb(_: String, _: String))
-    val probNoiseStartToOriginStart: String = makeColName(NOISE_START, ORIGIN_START, PROB)
-    val probNoiseEndToOriginEnd: String = makeColName(NOISE_END, ORIGIN_END, PROB)
+
     val eStepInitDataDF: DataFrame = noiseDataDF
       .distinct()
-      .crossJoin(originCaseDF)
+      .crossJoin(originCaseCrossedDF)
       .withColumn(probNoiseStartToOriginStart, getProbUdf(col(NOISE_START), col(ORIGIN_START)))
       .withColumn(probNoiseEndToOriginEnd, getProbUdf(col(NOISE_END), col(ORIGIN_END)))
       .withColumn(PROB, col(probNoiseStartToOriginStart) * col(probNoiseEndToOriginEnd))
