@@ -59,7 +59,7 @@ object MakeOriginData {
       .withColumn(PROB, col(COUNT) / lit(total.value))
       .select(ORIGIN_START, ORIGIN_END, PROB)
 
-    saveDataFrame(originDataProbDF, pathConf.originDataProbPath, paramConf.value.saveFileFormat)
+    saveDataFrame(originDataProbDF, pathConf.originDataPath, paramConf.value.saveFileFormat)
   }
 
 

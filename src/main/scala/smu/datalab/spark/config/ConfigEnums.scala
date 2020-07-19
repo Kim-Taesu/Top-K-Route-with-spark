@@ -14,6 +14,7 @@ object ConfigEnums {
 
   val P_VALUE: String = "pValue"
   val EPSILON: String = "epsilon"
+  val THRESHOLD: String = "threshold"
   val DEST_CODE_LIST: String = "destCode"
   val SAVE_FILE_FORMAT: String = "saveFileFormat"
 
@@ -33,8 +34,17 @@ object ConfigEnums {
   val CNT_OFF: String = "CntOff"
   val CNT_EMP: String = "CntEmp"
   val EMPTY: String = ""
+  val ITERATOR_CNT: String = "iteratorCnt"
 
+  val E_STEP_PROB: String = "e_step_prob"
+  val E_STEP_RESULT: String = "e_step_result"
+  val E_STEP_RESULT_SUM: String = "e_step_result_sum"
+  val E_STEP_SUM: String = "e_step_sum"
+  val M_STEP_TMP: String = "m_step_tmp"
 
+  val ID: String = "id"
+  val PRE_THETA: String = "pre_theta"
+  val THETA: String = "theta"
   val HEADER: String = "header"
   val PROB: String = "prob"
   val RLP: String = "rlp"
@@ -51,7 +61,7 @@ object ConfigEnums {
 
   val DEST_SIZE: String = "destSize"
   val SAVE: String = "save"
-  val ORIGIN_DATA_PROB_PATH: String = "originDataProb"
+  val ORIGIN_DATA_PATH: String = "originDataPath"
   val NOISE_DATA_PATH: String = "noiseDataPath"
   val E_STEP_INIT_DATA_PATH: String = "eStepInitDataPath"
 
