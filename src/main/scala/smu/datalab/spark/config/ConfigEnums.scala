@@ -72,7 +72,7 @@ object ConfigEnums {
 
   val RAW_DATA_DEST_COL_INDEX: Int = 3
 
-  val CONFIG_PATH: String = "app-local.conf"
+  val CONFIG_PATH: String = "app-config.conf"
 
   val NO_EXIST: String = "0"
   val EXIST: String = "1"
