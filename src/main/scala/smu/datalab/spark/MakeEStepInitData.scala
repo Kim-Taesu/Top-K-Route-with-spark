@@ -1,6 +1,7 @@
 package smu.datalab.spark
 
 import com.typesafe.config.ConfigFactory
+import org.apache.log4j.{LogManager, Logger}
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.sql.expressions.UserDefinedFunction
 import org.apache.spark.sql.functions.{col, udf}
@@ -13,6 +14,8 @@ import scala.sys.exit
 import scala.util.Random
 
 object MakeEStepInitData {
+  val log: Logger = LogManager.getRootLogger
+
   val usage: String =
     """
       | --------------------------------------
@@ -77,8 +80,8 @@ object MakeEStepInitData {
 
   private def checkArgs(args: Array[String]): Unit = {
     if (args.length != 1 || args.apply(0).eq("makeEStepInitData")) {
-      println(usage)
-      println(s" Error: ${args.mkString(" ")}")
+      log.error(usage)
+      log.error(s"[args error] Cased By: ${args.mkString(" ")}")
       exit(1)
     }
   }

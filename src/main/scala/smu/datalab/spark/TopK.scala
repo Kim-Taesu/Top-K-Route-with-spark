@@ -1,18 +1,22 @@
 package smu.datalab.spark
 
 import com.typesafe.config.ConfigFactory
+import org.apache.log4j.{LogManager, Logger}
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import smu.datalab.spark.config.ConfigEnums._
-import smu.datalab.spark.config.ParamConfig
+import smu.datalab.spark.config.{ParamConfig, PathConfig}
 import smu.datalab.spark.util.Utils._
 
 import scala.collection.mutable.ListBuffer
 import scala.sys.exit
 
 object TopK {
+
+  val log: Logger = LogManager.getRootLogger
+
   val usage: String =
     """
       | --------------------------------------
@@ -23,6 +27,7 @@ object TopK {
       |""".stripMargin
 
   def main(args: Array[String]): Unit = {
+
     checkArgs(args)
 
     val spark: SparkSession = buildSparkSession("top k")
@@ -30,13 +35,16 @@ object TopK {
 
     val conf = ConfigFactory.load(CONFIG_PATH.toString)
     val paramConf: Broadcast[ParamConfig] = spark.sparkContext.broadcast(ParamConfig(conf))
+    val pathConf: PathConfig = PathConfig(conf)
 
-    val originDataDF: DataFrame = loadDataFrame(spark, ORIGIN_DATA_PATH)
-      .select(ORIGIN_START, ORIGIN_END)
-      .withColumn(ID, monotonically_increasing_id())
-    val noiseDataDF: DataFrame = loadDataFrame(spark, NOISE_DATA_PATH)
+    val saveFileFormat = paramConf.value.saveFileFormat
+    val originDataDF: DataFrame = loadDataFrame(spark, s"${pathConf.originDataPath}/*.$saveFileFormat")
+      .select(ORIGIN_START, ORIGIN_END, PROB)
+      .withColumnRenamed(PROB, ORIGIN_PROB)
+      .withColumn(ID, row_number.over(Window.partitionBy().orderBy(ORIGIN_START, ORIGIN_END)))
+    val noiseDataDF: DataFrame = loadDataFrame(spark, s"${pathConf.noiseDataPath}/*.$saveFileFormat")
       .groupBy(NOISE_START, NOISE_END).count()
-    val eStepInitDataDF: DataFrame = loadDataFrame(spark, E_STEP_INIT_DATA_PATH)
+    val eStepInitDataDF: DataFrame = loadDataFrame(spark, s"${pathConf.eStepInitDataPath}/*.$saveFileFormat")
 
     originDataDF.cache()
     eStepInitDataDF.cache()
@@ -46,13 +54,19 @@ object TopK {
     val threshold: Double = paramConf.value.threshold
     val iteratorCnt: Int = paramConf.value.iteratorCnt
     val dataTotal: Long = noiseDataDF.select(COUNT).rdd.map(_.getLong(0)).reduce(_ + _)
-    val preThetaList = ListBuffer.fill(destCodeSize * destCodeSize)(1.0 / (destCodeSize * destCodeSize))
-    var flag: Boolean = true
+    var find: Boolean = false
+    val preThetaList: Broadcast[ListBuffer[(Double, Int)]] = spark.sparkContext.broadcast(ListBuffer
+      .fill(destCodeSize * destCodeSize)(1.0 / (destCodeSize * destCodeSize))
+      .zip(originDataDF.select(ID).collect().map(_.getInt(0))))
 
-    for (i <- 1 to iteratorCnt if flag) {
+    log.info(s"[param info] dest code size: $destCodeSize")
+    log.info(s"[param info] threshold: $threshold")
+    log.info(s"[param info] iterator max: $iteratorCnt")
+    log.info(s"[param info] data total size: $dataTotal")
 
-      val preThetaDF: DataFrame = originDataDF
-        .join(preThetaList.toDF(PRE_THETA).withColumn(ID, monotonically_increasing_id), ID)
+    for (i <- 1 to iteratorCnt if !find) {
+      val startTime: Long = System.currentTimeMillis()
+      val preThetaDF: DataFrame = originDataDF.join(preThetaList.value.toDF(PRE_THETA, ID), ID)
 
       val eStepDataDF: DataFrame = eStepInitDataDF
         .join(preThetaDF, Seq(ORIGIN_START, ORIGIN_END))
@@ -68,41 +82,45 @@ object TopK {
         .select(col(ORIGIN_START), col(ORIGIN_END), (col(E_STEP_RESULT_SUM) / dataTotal).as(THETA))
         .orderBy(ORIGIN_START, ORIGIN_END)
 
-      val theta: Array[Double] = mStepDataDF.collect().map(_.getDouble(2))
+      val theta: Array[Double] = mStepDataDF.select(THETA).collect().map(_.getDouble(0))
 
       var maxValue: Double = 0.0
-      for (i <- preThetaList.indices) {
-        val pre_value: Double = preThetaList(i)
-        val new_value: Double = theta(i)
-        maxValue = Math.max(maxValue, Math.abs(pre_value - new_value))
+      for (i <- theta.indices) {
+        val currentTheta: Double = preThetaList.value(i)._1
+        val newTheta: Double = theta(i)
+        val thetaDiff = currentTheta - newTheta
+        maxValue = Math.max(maxValue, Math.abs(thetaDiff))
       }
 
       if (maxValue >= threshold) {
-        flag = false
+        find = true
       }
 
-      // success
-      if (flag) {
-        preThetaList.clear()
-        theta.foreach(item => {
-          preThetaList.append(item)
-        })
-      }
-      else {
-        println("iterator count\t" + i)
-        println("max value\t" + maxValue)
-        val thetaTotal: Double = theta.sum
-        theta.foreach(item => {
-          println(item / thetaTotal)
-        })
-      }
+      copyTheta(preThetaList.value, theta)
+      log.info(s"[em processing] ${i}th: $maxValue (${(System.currentTimeMillis() - startTime) / 1000.0}s)")
+    }
+
+    val thetaTotal: Double = preThetaList.value.map(_._1).sum
+    val finalDF = preThetaList.value
+      .map(item => (item._1 / thetaTotal, item._2))
+      .toDF(NOISE_PROB, ID)
+      .join(originDataDF, ID)
+      .select(ORIGIN_START, ORIGIN_END, ORIGIN_PROB, NOISE_PROB)
+      .coalesce(1)
+    saveDataFrame(finalDF, s"${pathConf.resultDataPath}/$destCodeSize", CSV)
+  }
+
+  private def copyTheta(preThetaList: ListBuffer[(Double, Int)], theta: Array[Double]): Unit = {
+    preThetaList.clear()
+    for (i <- theta.indices) {
+      preThetaList.append((theta(i), i + 1))
     }
   }
 
   private def checkArgs(args: Array[String]): Unit = {
     if (args.length != 1 || args.apply(0).eq("makeEStepInitData")) {
-      println(usage)
-      println(s" Error: ${args.mkString(" ")}")
+      log.error(usage)
+      log.error(s"[args error] Cased By: ${args.mkString(" ")}")
       exit(1)
     }
   }

@@ -58,12 +58,17 @@ object ConfigEnums {
   val NOISE_END: String = s"${NOISE}_$END"
   val ORIGIN_START: String = s"${ORIGIN}_$START"
   val ORIGIN_END: String = s"${ORIGIN}_$END"
+  val ORIGIN_PROB: String = s"${ORIGIN}_$PROB"
+  val NOISE_PROB: String = s"${NOISE}_$PROB"
+
+  val CSV: String = "csv"
 
   val DEST_SIZE: String = "destSize"
   val SAVE: String = "save"
   val ORIGIN_DATA_PATH: String = "originDataPath"
   val NOISE_DATA_PATH: String = "noiseDataPath"
   val E_STEP_INIT_DATA_PATH: String = "eStepInitDataPath"
+  val RESULT_DATA_PATH: String = "resultDataPath"
 
   val RAW_DATA_DEST_COL_INDEX: Int = 3
 

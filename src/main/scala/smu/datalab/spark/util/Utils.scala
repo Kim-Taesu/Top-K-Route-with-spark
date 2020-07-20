@@ -1,6 +1,5 @@
 package smu.datalab.spark.util
 
-import org.apache.log4j.lf5.LogLevel
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{Column, DataFrame, SaveMode, SparkSession}
@@ -14,14 +13,13 @@ object Utils {
   }
 
   def buildSparkSession(appName: String): SparkSession = {
-    val sparkSession = SparkSession.builder()
+    SparkSession.builder()
       .master("local[*]")
       .appName(appName)
+      .config("spark.sql.shuffle.partitions", 16)
       .config("spark.sql.crossJoin.enabled", value = true)
       .config("org.apache.spark.serializer.KryoSerializer", value = true)
       .getOrCreate()
-    sparkSession.sparkContext.setLogLevel(LogLevel.WARN.toString)
-    sparkSession
   }
 
   def makeColList(cols: String*): Seq[Column] = {

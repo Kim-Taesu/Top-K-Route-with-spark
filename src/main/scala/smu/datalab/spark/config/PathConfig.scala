@@ -13,4 +13,5 @@ case class PathConfig(config: Config) {
   val originDataPath: String = config.getString(makePath(PATHS, SAVE, ORIGIN_DATA_PATH))
   val noiseDataPath: String = config.getString(makePath(PATHS, SAVE, NOISE_DATA_PATH))
   val eStepInitDataPath: String = config.getString(makePath(PATHS, SAVE, E_STEP_INIT_DATA_PATH))
+  val resultDataPath: String = config.getString(makePath(PATHS, SAVE, RESULT_DATA_PATH))
 }

@@ -1,6 +1,7 @@
 package smu.datalab.spark
 
 import com.typesafe.config.ConfigFactory
+import org.apache.log4j.{LogManager, Logger}
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.sql.expressions.UserDefinedFunction
 import org.apache.spark.sql.functions.{col, lit, sum, udf}
@@ -12,6 +13,9 @@ import smu.datalab.spark.util.Utils.{buildSparkSession, loadRawDataFrame, saveDa
 import scala.sys.exit
 
 object MakeOriginData {
+
+  val log: Logger = LogManager.getRootLogger
+
   type OptionMap = Map[String, Int]
   val usage: String =
     """
@@ -65,7 +69,7 @@ object MakeOriginData {
 
   private def checkArgs(args: _root_.scala.Array[_root_.scala.Predef.String]): OptionMap = {
     if (args.length == 0) {
-      println(usage)
+      log.error(s"[args error] Caused By: args size is 0")
       exit(1)
     }
     val argList: List[String] = args.toList
@@ -85,14 +89,14 @@ object MakeOriginData {
           value.toInt
         } catch {
           case _: NumberFormatException =>
-            println(usage)
-            println(" Number Format Error: " + value)
+            log.error(usage)
+            log.error(s"[args error] Cased By: Number Format Error ($value) ")
             exit(1)
         }
         nextOption(map ++ Map(DEST_SIZE -> value.toInt), Nil)
       case option :: _ =>
-        println(usage)
-        println(" Unknown option: " + option)
+        log.error(usage)
+        log.error(s"[args error] Cased By: Unknown option ($option) ")
         exit(1)
     }
   }
