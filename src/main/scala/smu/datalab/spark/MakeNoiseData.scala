@@ -41,11 +41,8 @@ object MakeNoiseData {
     val pathConf: PathConfig = PathConfig(conf)
 
     val destCodeList: Seq[String] = paramConf.value.getDestCodeList(destNum)
-    val qValue = paramConf.value.qValue
-    val pValue = paramConf.value.pValue
-    val rawDataPath: String = pathConf.testSamplePath
 
-    val rawDataDF: DataFrame = loadRawDataFrame(spark, rawDataPath, destCodeList)
+    val rawDataDF: DataFrame = loadRawDataFrame(spark, pathConf.testSamplePath, destCodeList)
     rawDataDF.cache()
 
     val addNoise: String => String = dest => {
@@ -54,10 +51,10 @@ object MakeNoiseData {
       for (i <- destCodeList.indices) {
         val prob = random.nextDouble()
         if (i == index) {
-          val nextItem = if (prob < pValue) EXIST else NO_EXIST
+          val nextItem = if (prob < paramConf.value.pValue) EXIST else NO_EXIST
           result = result.concat(nextItem)
         } else {
-          val nextItem = if (prob < qValue) EXIST else NO_EXIST
+          val nextItem = if (prob < paramConf.value.qValue) EXIST else NO_EXIST
           result = result.concat(nextItem)
         }
       }

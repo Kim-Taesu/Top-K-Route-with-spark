@@ -14,7 +14,6 @@ object Utils {
 
   def buildSparkSession(appName: String): SparkSession = {
     SparkSession.builder()
-      .master("local[*]")
       .appName(appName)
       .config("spark.sql.shuffle.partitions", 16)
       .config("spark.sql.crossJoin.enabled", value = true)

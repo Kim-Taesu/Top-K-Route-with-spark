@@ -35,10 +35,10 @@ object MakeOriginData {
     val spark: SparkSession = buildSparkSession("make origin data prob")
 
     val conf = ConfigFactory.load(CONFIG_PATH.toString)
-    val paramConf: Broadcast[ParamConfig] = spark.sparkContext.broadcast(ParamConfig(conf))
+    val paramConf: ParamConfig = ParamConfig(conf)
     val pathConf: PathConfig = PathConfig(conf)
 
-    val destCodeList: Seq[String] = paramConf.value.getDestCodeList(destNum)
+    val destCodeList: Seq[String] = paramConf.getDestCodeList(destNum)
     val rawDataPath: String = pathConf.testSamplePath
 
     val rawDataDF: DataFrame = loadRawDataFrame(spark, rawDataPath, destCodeList)
@@ -63,7 +63,7 @@ object MakeOriginData {
       .withColumn(PROB, col(COUNT) / lit(total.value))
       .select(ORIGIN_START, ORIGIN_END, PROB)
 
-    saveDataFrame(originDataProbDF, pathConf.originDataPath, paramConf.value.saveFileFormat)
+    saveDataFrame(originDataProbDF, pathConf.originDataPath, paramConf.saveFileFormat)
   }
 
 

@@ -37,7 +37,7 @@ object TopK {
     val paramConf: Broadcast[ParamConfig] = spark.sparkContext.broadcast(ParamConfig(conf))
     val pathConf: PathConfig = PathConfig(conf)
 
-    val saveFileFormat = paramConf.value.saveFileFormat
+    val saveFileFormat: String = paramConf.value.saveFileFormat
     val originDataDF: DataFrame = loadDataFrame(spark, s"${pathConf.originDataPath}/*.$saveFileFormat")
       .select(ORIGIN_START, ORIGIN_END, PROB)
       .withColumnRenamed(PROB, ORIGIN_PROB)
@@ -55,9 +55,9 @@ object TopK {
     val iteratorCnt: Int = paramConf.value.iteratorCnt
     val dataTotal: Long = noiseDataDF.select(COUNT).rdd.map(_.getLong(0)).reduce(_ + _)
     var find: Boolean = false
-    val preThetaList: Broadcast[ListBuffer[(Double, Int)]] = spark.sparkContext.broadcast(ListBuffer
+    val preThetaList: ListBuffer[(Double, Int)] = ListBuffer
       .fill(destCodeSize * destCodeSize)(1.0 / (destCodeSize * destCodeSize))
-      .zip(originDataDF.select(ID).collect().map(_.getInt(0))))
+      .zip(originDataDF.select(ID).collect().map(_.getInt(0)))
 
     log.info(s"[param info] dest code size: $destCodeSize")
     log.info(s"[param info] threshold: $threshold")
@@ -66,10 +66,10 @@ object TopK {
 
     for (i <- 1 to iteratorCnt if !find) {
       val startTime: Long = System.currentTimeMillis()
-      val preThetaDF: DataFrame = originDataDF.join(preThetaList.value.toDF(PRE_THETA, ID), ID)
+      val preThetaDF: DataFrame = originDataDF.join(preThetaList.toDF(PRE_THETA, ID), ID)
 
       val eStepDataDF: DataFrame = eStepInitDataDF
-        .join(preThetaDF, Seq(ORIGIN_START, ORIGIN_END))
+        .join(broadcast(preThetaDF), Seq(ORIGIN_START, ORIGIN_END))
         .withColumn(E_STEP_PROB, col(PRE_THETA) * col(PROB))
         .withColumn(E_STEP_SUM, sum(E_STEP_PROB).over(Window.partitionBy(NOISE_START, NOISE_END)))
         .withColumn(E_STEP_RESULT, col(E_STEP_PROB) / col(E_STEP_SUM))
@@ -86,9 +86,9 @@ object TopK {
 
       var maxValue: Double = 0.0
       for (i <- theta.indices) {
-        val currentTheta: Double = preThetaList.value(i)._1
+        val currentTheta: Double = preThetaList(i)._1
         val newTheta: Double = theta(i)
-        val thetaDiff = currentTheta - newTheta
+        val thetaDiff: Double = currentTheta - newTheta
         maxValue = Math.max(maxValue, Math.abs(thetaDiff))
       }
 
@@ -96,12 +96,12 @@ object TopK {
         find = true
       }
 
-      copyTheta(preThetaList.value, theta)
+      copyTheta(preThetaList, theta)
       log.info(s"[em processing] ${i}th: $maxValue (${(System.currentTimeMillis() - startTime) / 1000.0}s)")
     }
 
-    val thetaTotal: Double = preThetaList.value.map(_._1).sum
-    val finalDF = preThetaList.value
+    val thetaTotal: Double = preThetaList.map(_._1).sum
+    val finalDF = preThetaList
       .map(item => (item._1 / thetaTotal, item._2))
       .toDF(NOISE_PROB, ID)
       .join(originDataDF, ID)

@@ -37,13 +37,10 @@ object MakeEStepInitData {
     val paramConf: Broadcast[ParamConfig] = spark.sparkContext.broadcast(ParamConfig(conf))
     val pathConf: PathConfig = PathConfig(conf)
 
-    val qValue = paramConf.value.qValue
-    val pValue = paramConf.value.pValue
-    val saveFileFormat = paramConf.value.saveFileFormat
     val probNoiseStartToOriginStart: String = makeColName(NOISE_START, ORIGIN_START, PROB)
     val probNoiseEndToOriginEnd: String = makeColName(NOISE_END, ORIGIN_END, PROB)
 
-    val noiseDataDF: DataFrame = loadDataFrame(spark, s"${pathConf.noiseDataPath}/*.$saveFileFormat")
+    val noiseDataDF: DataFrame = loadDataFrame(spark, s"${pathConf.noiseDataPath}/*.${paramConf.value.saveFileFormat}")
     val noiseBitMaskRowTmp: String = noiseDataDF.select(NOISE_START).first().getString(0)
 
     val originArray: Seq[String] = for (i <- noiseBitMaskRowTmp.indices) yield NO_EXIST * noiseBitMaskRowTmp.length + (1 << i).toBinaryString takeRight noiseBitMaskRowTmp.length
@@ -55,11 +52,11 @@ object MakeEStepInitData {
       var prob: Double = 1.0
       for (i <- 0 until origin.length) {
         if (origin.charAt(i) == noise.charAt(i)) {
-          val nextProb = if (origin.charAt(i).toString == EXIST) 1 - pValue else 1 - qValue
+          val nextProb = if (origin.charAt(i).toString == EXIST) 1 - paramConf.value.pValue else 1 - paramConf.value.qValue
           prob = prob * nextProb
         }
         else {
-          val nextProb = if (origin.charAt(i).toString == EXIST) pValue else qValue
+          val nextProb = if (origin.charAt(i).toString == EXIST) paramConf.value.pValue else paramConf.value.qValue
           prob = prob * nextProb
         }
       }
@@ -75,7 +72,7 @@ object MakeEStepInitData {
       .withColumn(PROB, col(probNoiseStartToOriginStart) * col(probNoiseEndToOriginEnd))
       .select(NOISE_START, ORIGIN_START, NOISE_END, ORIGIN_END, PROB)
 
-    saveDataFrame(eStepInitDataDF, pathConf.eStepInitDataPath, saveFileFormat)
+    saveDataFrame(eStepInitDataDF, pathConf.eStepInitDataPath, paramConf.value.saveFileFormat)
   }
 
   private def checkArgs(args: Array[String]): Unit = {
